@@ -1,0 +1,73 @@
+# 依赖和包管理
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# 编译输出
+dist/
+build/
+*.tsbuildinfo
+
+# 环境变量和配置
+.env
+.env.*
+!.env.example
+
+# 日志文件
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# PM2
+.pm2/
+ecosystem.config.js
+
+# IDE和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+
+# 测试和覆盖率
+coverage/
+.nyc_output/
+.jest/
+
+# 运行时
+*.pid
+*.seed
+*.pid.lock
+
+# 文档生成
+docs/
+documentation/
+
+# 备份文件
+*.bak
+*.backup
+*.old
+
+# 压缩文件
+*.zip
+*.tar.gz
+*.rar
+*.7z 
