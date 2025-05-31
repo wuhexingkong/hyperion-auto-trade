@@ -66,14 +66,17 @@ su -
 
 安装过程中需要配置以下参数：
 
-| 参数 | 说明 | 示例 |
-|------|------|------|
+| 参数 | 说明 | 示例/默认值 |
+|------|------|-------------|
 | `PRIVATE_KEY` | 钱包私钥 (必须以 ed25519-priv- 开头) | `ed25519-priv-0x123...` |
-| `COIN1_ADDRESS` | 第一种代币地址 | 默认 USDT 地址 |
-| `COIN2_ADDRESS` | 第二种代币地址 | 默认 USDC 地址 |
 | `SLIPPAGE_PERCENT` | 滑点百分比 | 默认 0.3% |
 | `MIN_SLEEP_SECONDS` | 最小休眠时间 | 默认 10 秒 |
 | `MAX_SLEEP_SECONDS` | 最大休眠时间 | 默认 30 秒 |
+
+### 固定交易对
+程序专门用于以下交易对，无需配置：
+- **USDT**: `0x357b0b74bc833e95a115ad22604854d6b0fca151cecd94111770e5d6ffc9dc2b`
+- **USDC**: `0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b`
 
 ## 📊 安装后管理
 
@@ -106,7 +109,50 @@ pm2 delete hyperion-auto-trade
 
 ### 常见问题
 
-1. **权限错误**
+1. **PM2 命令不可用 (Command 'pm2' not found)**
+   
+   这是最常见的环境变量问题，通常发生在安装完成后新开终端时。
+   
+   **解决方案**:
+   ```bash
+   # 方法1: 重新加载环境变量
+   source ~/.bashrc
+   source ~/.profile
+   
+   # 方法2: 手动加载NVM环境
+   export NVM_DIR="$HOME/.nvm"
+   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+   nvm use 22.14.0
+   
+   # 方法3: Root用户特殊处理
+   # 如果是root用户，使用以下路径
+   export NVM_DIR="/root/.nvm"
+   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+   nvm use 22.14.0
+   
+   # 验证修复结果
+   pm2 -v
+   pm2 status
+   ```
+   
+   **创建修复脚本**:
+   ```bash
+   # 创建一键修复脚本
+   cat > fix-pm2-env.sh << 'EOF'
+   #!/bin/bash
+   export NVM_DIR="$HOME/.nvm"
+   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+   [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+   nvm use 22.14.0
+   echo "Node.js版本: $(node -v)"
+   echo "PM2版本: $(pm2 -v)"
+   pm2 status
+   EOF
+   
+   chmod +x fix-pm2-env.sh && ./fix-pm2-env.sh
+   ```
+
+2. **权限错误**
    ```bash
    # 普通用户
    sudo chown -R $USER:$USER /opt/hyperion-auto-trade
@@ -115,7 +161,7 @@ pm2 delete hyperion-auto-trade
    chown -R root:root /opt/hyperion-auto-trade
    ```
 
-2. **Node.js 版本问题**
+3. **Node.js 版本问题**
    ```bash
    # 重新加载环境变量
    source ~/.bashrc
@@ -125,21 +171,40 @@ pm2 delete hyperion-auto-trade
    source /root/.bashrc
    ```
 
-3. **网络连接问题**
+4. **网络连接问题**
    - 检查防火墙设置
    - 验证 DNS 解析
    - 尝试使用代理
 
-4. **PM2 服务未启动**
+5. **PM2 服务未启动**
    ```bash
    cd /opt/hyperion-auto-trade
    ./deploy.sh
    ```
 
-5. **Root用户特定问题**
+6. **Root用户特定问题**
    - **NVM路径问题**: Root用户的NVM安装在 `/root/.nvm/`
    - **权限问题**: 确保所有文件属于root用户
    - **环境变量**: 可能需要手动加载 `/root/.bashrc`
+
+### 环境变量永久修复
+
+如果经常遇到PM2不可用的问题，可以将环境变量永久添加到配置文件：
+
+```bash
+# 添加到 .bashrc (推荐)
+echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc
+echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.bashrc
+echo '[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"' >> ~/.bashrc
+
+# Root用户使用
+echo 'export NVM_DIR="/root/.nvm"' >> /root/.bashrc
+echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> /root/.bashrc
+echo '[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"' >> /root/.bashrc
+
+# 重新加载配置
+source ~/.bashrc
+```
 
 ### 重新安装
 

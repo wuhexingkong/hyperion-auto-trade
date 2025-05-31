@@ -4,11 +4,12 @@ import {
   Account, 
   Ed25519PrivateKey,
   AccountAddress,
-  InputEntryFunctionData
+  InputEntryFunctionData,
+  Network
 } from '@aptos-labs/ts-sdk';
-import { config } from '../config';
-import { logger } from '../utils/logger';
-import { normalizeAddress } from '../utils/helpers';
+import { config } from '../config/index.js';
+import { logger } from '../utils/logger.js';
+import { normalizeAddress } from '../utils/helpers.js';
 
 export class AptosClient {
   private aptos: Aptos;
@@ -16,9 +17,9 @@ export class AptosClient {
   private tokenNameCache: Map<string, string> = new Map();
 
   constructor() {
-    // 初始化Aptos配置
+    // 初始化Aptos配置 - 使用主网
     const aptosConfig = new AptosConfig({ 
-      network: config.network 
+      network: Network.MAINNET 
     });
     
     this.aptos = new Aptos(aptosConfig);
@@ -27,7 +28,7 @@ export class AptosClient {
     const privateKey = new Ed25519PrivateKey(config.privateKey);
     this.account = Account.fromPrivateKey({ privateKey });
     
-    logger.info(`初始化Aptos客户端，网络: ${config.network}`);
+    logger.info(`初始化Aptos客户端，网络: MAINNET`);
     logger.info(`钱包地址: ${this.account.accountAddress.toString()}`);
   }
 

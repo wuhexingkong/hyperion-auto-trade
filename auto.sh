@@ -230,6 +230,9 @@ check_install_npm() {
 check_install_pm2() {
     log_step "检查PM2安装状态..."
     
+    # 确保NVM环境已加载
+    reload_node_env
+    
     if command -v pm2 &> /dev/null; then
         log_info "PM2 已安装，版本: $(pm2 -v)"
     else
@@ -244,12 +247,79 @@ check_install_pm2() {
             npm install -g pm2
         fi
         
+        # 重新加载环境变量以确保PM2可用
+        reload_node_env
+        
         # 验证PM2安装
         if command -v pm2 &> /dev/null; then
             log_info "PM2 安装完成，版本: $(pm2 -v)"
         else
-            log_error "PM2 安装失败"
-            exit 1
+            log_error "PM2 安装失败，尝试重新加载环境变量..."
+            
+            # 强制重新加载环境变量
+            force_reload_env
+            
+            # 再次检查
+            if command -v pm2 &> /dev/null; then
+                log_info "PM2 现在可用，版本: $(pm2 -v)"
+            else
+                log_error "PM2 仍然不可用，请手动检查安装"
+                exit 1
+            fi
+        fi
+    fi
+}
+
+# 重新加载Node.js环境变量
+reload_node_env() {
+    log_info "重新加载Node.js环境变量..."
+    
+    # 加载NVM环境
+    export NVM_DIR="$INSTALL_HOME/.nvm"
+    if [ -s "$NVM_DIR/nvm.sh" ]; then
+        \. "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+        
+        # 使用正确的Node.js版本
+        nvm use 22.14.0 2>/dev/null || nvm use default 2>/dev/null || true
+    fi
+    
+    # 重新加载bash配置文件
+    [ -f "$INSTALL_HOME/.bashrc" ] && source "$INSTALL_HOME/.bashrc" 2>/dev/null || true
+    [ -f "$INSTALL_HOME/.profile" ] && source "$INSTALL_HOME/.profile" 2>/dev/null || true
+}
+
+# 强制重新加载所有环境变量
+force_reload_env() {
+    log_warn "强制重新加载环境变量..."
+    
+    # 重新加载NVM
+    export NVM_DIR="$INSTALL_HOME/.nvm"
+    if [ -s "$NVM_DIR/nvm.sh" ]; then
+        \. "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+        
+        # 确保使用正确版本
+        nvm use 22.14.0 2>/dev/null || nvm use default 2>/dev/null || true
+        
+        log_info "当前Node.js版本: $(node -v 2>/dev/null || echo '未找到')"
+        log_info "当前NPM版本: $(npm -v 2>/dev/null || echo '未找到')"
+    fi
+    
+    # 重新加载所有配置文件
+    for config_file in "$INSTALL_HOME/.bashrc" "$INSTALL_HOME/.profile" "$INSTALL_HOME/.bash_profile"; do
+        if [ -f "$config_file" ]; then
+            source "$config_file" 2>/dev/null || true
+            log_info "已重新加载: $config_file"
+        fi
+    done
+    
+    # 手动添加npm全局bin目录到PATH（如果需要）
+    if command -v npm &> /dev/null; then
+        NPM_GLOBAL_PATH=$(npm config get prefix 2>/dev/null)/bin
+        if [ -d "$NPM_GLOBAL_PATH" ] && [[ ":$PATH:" != *":$NPM_GLOBAL_PATH:"* ]]; then
+            export PATH="$NPM_GLOBAL_PATH:$PATH"
+            log_info "已添加npm全局bin目录到PATH: $NPM_GLOBAL_PATH"
         fi
     fi
 }
@@ -345,6 +415,7 @@ configure_env() {
     
     echo
     echo "=== 配置环境变量 ==="
+    echo "本程序专门用于 USDT/USDC 交易对刷量"
     echo
     
     # 输入私钥
@@ -365,28 +436,6 @@ configure_env() {
             log_error "私钥格式错误，必须以 ed25519-priv- 开头"
         fi
     done
-    
-    # 输入COIN1地址
-    echo -n "请输入第一种代币地址 (COIN1_ADDRESS，默认USDT: 0x357b0b74bc833e95a115ad22604854d6b0fca151cecd94111770e5d6ffc9dc2b): "
-    if [ -c /dev/tty ]; then
-        read -r COIN1_ADDRESS < /dev/tty
-    else
-        read -r COIN1_ADDRESS
-    fi
-    if [ -z "$COIN1_ADDRESS" ]; then
-        COIN1_ADDRESS="0x357b0b74bc833e95a115ad22604854d6b0fca151cecd94111770e5d6ffc9dc2b"
-    fi
-    
-    # 输入COIN2地址
-    echo -n "请输入第二种代币地址 (COIN2_ADDRESS，默认USDC: 0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b): "
-    if [ -c /dev/tty ]; then
-        read -r COIN2_ADDRESS < /dev/tty
-    else
-        read -r COIN2_ADDRESS
-    fi
-    if [ -z "$COIN2_ADDRESS" ]; then
-        COIN2_ADDRESS="0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b"
-    fi
     
     # 输入滑点百分比
     echo -n "请输入滑点百分比 (SLIPPAGE_PERCENT，默认0.3%): "
@@ -434,12 +483,6 @@ configure_env() {
             PRIVATE_KEY=*)
                 echo "PRIVATE_KEY=$PRIVATE_KEY" >> "$TEMP_ENV"
                 ;;
-            COIN1_ADDRESS=*)
-                echo "COIN1_ADDRESS=$COIN1_ADDRESS" >> "$TEMP_ENV"
-                ;;
-            COIN2_ADDRESS=*)
-                echo "COIN2_ADDRESS=$COIN2_ADDRESS" >> "$TEMP_ENV"
-                ;;
             SLIPPAGE_PERCENT=*)
                 echo "SLIPPAGE_PERCENT=$SLIPPAGE_PERCENT" >> "$TEMP_ENV"
                 ;;
@@ -462,8 +505,9 @@ configure_env() {
     
     # 验证配置文件（不显示私钥）
     log_info "配置验证："
-    echo "  COIN1_ADDRESS: $COIN1_ADDRESS"
-    echo "  COIN2_ADDRESS: $COIN2_ADDRESS"
+    echo "  交易对: USDT/USDC (固定)"
+    echo "  USDT地址: 0x357b0b74bc833e95a115ad22604854d6b0fca151cecd94111770e5d6ffc9dc2b"
+    echo "  USDC地址: 0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b"
     echo "  SLIPPAGE_PERCENT: $SLIPPAGE_PERCENT%"
     echo "  MIN_SLEEP_SECONDS: ${MIN_SLEEP_SECONDS}s"
     echo "  MAX_SLEEP_SECONDS: ${MAX_SLEEP_SECONDS}s"
@@ -476,6 +520,9 @@ deploy_project() {
     
     # 确保在项目目录中
     cd /opt/hyperion-auto-trade
+    
+    # 确保Node.js和PM2环境可用
+    reload_node_env
     
     # 验证配置文件
     if [ ! -f ".env" ]; then
@@ -502,12 +549,25 @@ deploy_project() {
     # 等待服务启动
     sleep 5
     
+    # 再次确保PM2环境可用
+    reload_node_env
+    
     # 检查服务状态
-    if pm2 list | grep -q "hyperion-auto-trade"; then
-        log_info "服务启动成功"
-        pm2 status
+    log_info "检查服务状态..."
+    if command -v pm2 &> /dev/null; then
+        if pm2 list | grep -q "hyperion-auto-trade"; then
+            log_info "服务启动成功"
+            pm2 status
+        else
+            log_warn "服务可能未正常启动，请手动检查"
+            log_info "尝试显示PM2进程列表："
+            pm2 list || log_warn "无法获取PM2进程列表"
+        fi
     else
-        log_warn "服务可能未正常启动，请手动检查"
+        log_error "PM2命令不可用，无法检查服务状态"
+        log_info "请手动运行以下命令检查："
+        echo "  source ~/.bashrc"
+        echo "  pm2 status"
     fi
 }
 
@@ -521,12 +581,33 @@ show_completion() {
     echo "项目目录: /opt/hyperion-auto-trade"
     echo "安装用户: $INSTALL_USER"
     echo
+    
+    # 最后一次检查环境变量
+    log_info "最终环境检查..."
+    reload_node_env
+    
+    if command -v pm2 &> /dev/null; then
+        log_info "✅ PM2 环境正常，版本: $(pm2 -v)"
+    else
+        log_warn "⚠️  PM2 命令不可用，可能需要重新加载环境变量"
+        echo "请运行以下命令修复："
+        echo "  source ~/.bashrc"
+        echo "  source ~/.profile"
+        echo "  export NVM_DIR=\"$INSTALL_HOME/.nvm\""
+        echo "  [ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\""
+        echo "  nvm use 22.14.0"
+    fi
+    
+    echo
     echo "常用命令："
     echo "  查看状态: pm2 status"
     echo "  查看日志: pm2 logs hyperion-auto-trade"
     echo "  重启程序: pm2 restart hyperion-auto-trade"
     echo "  停止程序: pm2 stop hyperion-auto-trade"
     echo "  删除程序: pm2 delete hyperion-auto-trade"
+    echo
+    echo "如果PM2命令不可用，请先运行："
+    echo "  source ~/.bashrc && pm2 status"
     echo
     echo "日志文件位置："
     echo "  完整日志: /opt/hyperion-auto-trade/logs/hyperion.log"
@@ -552,6 +633,21 @@ show_completion() {
     echo "  2. 请确保有足够的APT支付Gas费用"
     echo "  3. 自动交易存在市场风险，请谨慎使用"
     echo "  4. 请妥善保管您的私钥，不要泄露给任何人"
+    echo
+    
+    # 提供环境变量修复脚本
+    echo "如果遇到PM2环境变量问题，可以创建并运行修复脚本："
+    echo "cat > fix-pm2-env.sh << 'EOF'"
+    echo "#!/bin/bash"
+    echo "export NVM_DIR=\"$INSTALL_HOME/.nvm\""
+    echo "[ -s \"\$NVM_DIR/nvm.sh\" ] && \\. \"\$NVM_DIR/nvm.sh\""
+    echo "[ -s \"\$NVM_DIR/bash_completion\" ] && \\. \"\$NVM_DIR/bash_completion\""
+    echo "nvm use 22.14.0"
+    echo "echo \"Node.js版本: \$(node -v)\""
+    echo "echo \"PM2版本: \$(pm2 -v)\""
+    echo "pm2 status"
+    echo "EOF"
+    echo "chmod +x fix-pm2-env.sh && ./fix-pm2-env.sh"
     echo
 }
 
