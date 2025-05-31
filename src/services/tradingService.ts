@@ -2,16 +2,17 @@ import { Account, Aptos, AptosConfig, Network, Ed25519PrivateKey } from '@aptos-
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 import { AptosClient } from './aptosClient.js';
+import { BalanceChecker } from '../utils/balanceChecker.js';
 import { 
   sleep, 
   formatTokenAmount 
 } from '../utils/helpers';
-import { checkAllBalances } from '../utils/balanceChecker';
 
 export class TradingService {
   private aptos: Aptos;
   private account: Account;
   private aptosClient: AptosClient;
+  private balanceChecker: BalanceChecker;
   private isRunning: boolean = false;
   private cycleCount: number = 0;
   private usdtName: string = '';
@@ -27,6 +28,9 @@ export class TradingService {
     
     // 创建AptosClient实例
     this.aptosClient = new AptosClient();
+    
+    // 创建BalanceChecker实例
+    this.balanceChecker = new BalanceChecker();
     
     logger.info(`交易账户地址: ${this.account.accountAddress.toString()}`);
   }
@@ -66,7 +70,7 @@ export class TradingService {
       await this.initializeTokenNames();
       
       // 详细余额检查
-      await checkAllBalances();
+      await this.balanceChecker.checkAllBalances();
 
       while (this.isRunning) {
         this.cycleCount++;
