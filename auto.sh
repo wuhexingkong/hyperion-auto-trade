@@ -314,7 +314,7 @@ force_reload_env() {
         fi
     done
     
-    # 手动添加npm全局bin目录到PATH（如果需要）
+    # 手动添加npm全局bin目录到PATH
     if command -v npm &> /dev/null; then
         NPM_GLOBAL_PATH=$(npm config get prefix 2>/dev/null)/bin
         if [ -d "$NPM_GLOBAL_PATH" ] && [[ ":$PATH:" != *":$NPM_GLOBAL_PATH:"* ]]; then
@@ -582,66 +582,42 @@ show_completion() {
     echo "安装用户: $INSTALL_USER"
     echo
     
-    # 最后一次检查环境变量
-    log_info "最终环境检查..."
+    # 检查服务状态
     reload_node_env
     
     if command -v pm2 &> /dev/null; then
         log_info "✅ PM2 环境正常，版本: $(pm2 -v)"
+        
+        if pm2 list | grep -q "hyperion-auto-trade"; then
+            log_info "✅ 服务已启动成功"
+            echo
+            pm2 status
+        else
+            log_warn "⚠️  服务可能未正常启动"
+        fi
+        
         echo
-        echo "常用命令："
-        echo "  查看状态: pm2 status"
-        echo "  查看日志: pm2 logs hyperion-auto-trade"
-        echo "  重启程序: pm2 restart hyperion-auto-trade"
-        echo "  停止程序: pm2 stop hyperion-auto-trade"
-        echo "  删除程序: pm2 delete hyperion-auto-trade"
+        echo "📋 常用管理命令："
+        echo "   pm2 status                        # 查看状态"
+        echo "   pm2 logs hyperion-auto-trade      # 查看日志"
+        echo "   pm2 restart hyperion-auto-trade   # 重启程序"
+        echo "   pm2 stop hyperion-auto-trade      # 停止程序"
+        echo
+        echo "📋 可选操作："
+        echo "   pm2 startup                       # 设置开机自启"
+        echo "   # 然后复制并执行输出的sudo命令"
+        
     else
-        echo
-        echo "🚨 ================================== 🚨"
-        log_error "PM2 环境变量问题检测到！"
-        echo "🚨 ================================== 🚨"
-        echo
-        echo "📋 解决方案（请按顺序执行）："
-        echo
-        echo "1️⃣  重新加载环境变量："
-        echo "   source ~/.bashrc"
-        echo
-        echo "2️⃣  如果第1步无效，手动加载NVM："
-        echo "   export NVM_DIR=\"$INSTALL_HOME/.nvm\""
-        echo "   [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\""
-        echo "   nvm use 22.14.0"
-        echo
-        echo "3️⃣  验证PM2是否可用："
-        echo "   pm2 --version"
-        echo "   pm2 status"
-        echo
-        echo "4️⃣  如果仍有问题，运行一键修复脚本："
-        echo "   cd /opt/hyperion-auto-trade"
-        echo "   ./fix-pm2-env.sh"
-        echo
-        echo "🔧 一键修复脚本已为您准备好："
+        log_error "❌ PM2 环境异常，请重新运行安装脚本"
     fi
     
     echo
-    echo "日志文件位置："
+    echo "📁 日志文件位置："
     echo "  完整日志: /opt/hyperion-auto-trade/logs/hyperion.log"
     echo "  错误日志: /opt/hyperion-auto-trade/logs/error.log"
     echo "  输出日志: /opt/hyperion-auto-trade/logs/out.log"
     echo
     
-    # 根据用户类型提供不同的提示
-    if [[ $EUID -eq 0 ]]; then
-        log_warn "⚠️  Root用户运行提醒："
-        echo "  1. 程序以root权限运行，请确保这是必要的"
-        echo "  2. 建议定期检查程序运行状态和安全性"
-        echo "  3. 如需切换到普通用户运行，请重新安装"
-    else
-        log_warn "⚠️  普通用户运行提醒："
-        echo "  1. 程序以普通用户权限运行，安全性较好"
-        echo "  2. 如需修改系统级配置，可能需要sudo权限"
-    fi
-    
-    echo
     log_warn "⚠️  重要提醒："
     echo "  1. 请确保钱包中有足够的代币余额"
     echo "  2. 请确保有足够的APT支付Gas费用"
@@ -649,69 +625,7 @@ show_completion() {
     echo "  4. 请妥善保管您的私钥，不要泄露给任何人"
     echo
     
-    # 创建环境变量修复脚本
-    echo "📝 正在创建PM2环境修复脚本..."
-    cat > /opt/hyperion-auto-trade/fix-pm2-env.sh << 'EOF'
-#!/bin/bash
-
-echo "🔧 开始修复PM2环境变量问题..."
-echo
-
-# 重新加载bashrc
-echo "1️⃣  重新加载 ~/.bashrc..."
-source ~/.bashrc
-echo "   ✅ 完成"
-
-# 加载NVM环境
-echo "2️⃣  加载NVM环境..."
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-echo "   ✅ 完成"
-
-# 切换到Node.js 22.14.0
-echo "3️⃣  切换到Node.js 22.14.0..."
-nvm use 22.14.0
-echo "   ✅ 完成"
-
-# 验证环境
-echo "4️⃣  验证环境..."
-echo "   Node.js版本: $(node -v)"
-echo "   NPM版本: $(npm -v)"
-
-if command -v pm2 &> /dev/null; then
-    echo "   PM2版本: $(pm2 -v)"
-    echo "   ✅ PM2环境修复成功！"
-    echo
-    echo "📊 当前PM2状态："
-    pm2 status
-else
-    echo "   ❌ PM2仍不可用，可能需要重新安装"
-    echo
-    echo "🔄 尝试重新安装PM2..."
-    npm install -g pm2
-    echo "   PM2版本: $(pm2 -v)"
-    echo "   ✅ PM2重新安装完成！"
-    echo
-    echo "📊 当前PM2状态："
-    pm2 status
-fi
-
-echo
-echo "🎉 环境修复完成！现在可以正常使用PM2命令了。"
-EOF
-
-    chmod +x /opt/hyperion-auto-trade/fix-pm2-env.sh
-    echo "   ✅ 修复脚本已创建: /opt/hyperion-auto-trade/fix-pm2-env.sh"
-    echo
-    
-    if ! command -v pm2 &> /dev/null; then
-        echo "💡 建议立即运行修复脚本："
-        echo "   cd /opt/hyperion-auto-trade && ./fix-pm2-env.sh"
-        echo
-    fi
-    
-    echo "🚀 安装完成！如有任何问题，请参考上述解决方案。"
+    echo "🚀 安装完成！程序已自动启动。"
 }
 
 # 主函数

@@ -87,10 +87,6 @@ pm2 start dist/index.js \
 echo "💾 保存 PM2 配置..."
 pm2 save
 
-# 设置 PM2 开机自启
-echo "⚙️  设置开机自启..."
-pm2 startup
-
 echo ""
 echo "✅ 部署完成！"
 echo ""
