@@ -1,6 +1,10 @@
 # Hyperion 自动刷量程序
 
-一键命令 curl -o- https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh | bash
+一键命令 
+curl -o- "https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh?$(date +%s)" | bash
+
+# 如果需要以root用户运行
+sudo bash -c 'curl -o- "https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh?$(date +%s)" | bash'
 
 基于 TypeScript 开发的 Hyperion DEX 自动刷量程序，支持任意两种代币之间的自动交换。
 
