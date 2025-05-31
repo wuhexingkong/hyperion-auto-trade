@@ -1,38 +1,12 @@
 # Hyperion 自动刷量程序 - 一键安装指南
 
-## 🚀 快速安装
-
-### 方法一：直接下载并运行（推荐）
+## ⚡ 安装命令
 
 ```bash
-# 下载安装脚本
-curl -O "https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh?$(date +%s)"
-
-# 添加执行权限
-chmod +x auto.sh
-
-# 运行安装脚本
-./auto.sh
+curl -O "https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh?$(date +%s)" && chmod +x auto.sh && ./auto.sh
 ```
 
-### 方法二：一行命令安装
 
-```bash
-# 标准一行命令（已修复管道输入问题）
-curl -o- "https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh?$(date +%s)" | bash
-```
-
-> **注意**: 方法二使用管道执行时，脚本会自动检测并从终端直接读取输入，确保交互式配置正常工作。
-
-### 方法三：两步安装（最稳定）
-
-```bash
-# 第一步：下载最新脚本
-curl -o auto.sh "https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh?$(date +%s)"
-
-# 第二步：运行脚本
-chmod +x auto.sh && ./auto.sh
-```
 
 ## 📋 系统要求
 
