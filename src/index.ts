@@ -49,8 +49,8 @@ function displayStartupInfo(): void {
   logger.info(`网络: ${config.network}`);
   logger.info(`滑点设置: ${config.slippagePercent}%`);
   logger.info(`休眠间隔: ${config.minSleepSeconds}-${config.maxSleepSeconds}秒`);
-  logger.info(`USDT地址: ${config.usdtAddress}`);
-  logger.info(`USDC地址: ${config.usdcAddress}`);
+  logger.info(`代币1地址: ${config.coin1Address}`);
+  logger.info(`代币2地址: ${config.coin2Address}`);
   logger.info(`Hyperion路由: ${config.hyperionRouter}`);
   logger.info('='.repeat(60));
 }

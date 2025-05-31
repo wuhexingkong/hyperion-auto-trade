@@ -13,6 +13,7 @@ import { normalizeAddress } from '../utils/helpers';
 export class AptosClient {
   private aptos: Aptos;
   private account: Account;
+  private tokenNameCache: Map<string, string> = new Map();
 
   constructor() {
     // 初始化Aptos配置
@@ -35,6 +36,62 @@ export class AptosClient {
    */
   getAccountAddress(): string {
     return this.account.accountAddress.toString();
+  }
+
+  /**
+   * 获取代币名称
+   * @param tokenAddress 代币合约地址
+   * @returns 代币名称或符号
+   */
+  async getTokenName(tokenAddress: string): Promise<string> {
+    const normalizedAddress = normalizeAddress(tokenAddress);
+    
+    // 检查缓存
+    if (this.tokenNameCache.has(normalizedAddress)) {
+      return this.tokenNameCache.get(normalizedAddress)!;
+    }
+
+    try {
+      // 尝试获取 Fungible Asset 元数据
+      try {
+        const faMetadata = await this.aptos.getFungibleAssetMetadataByAssetType({
+          assetType: normalizedAddress
+        });
+        
+        if (faMetadata && faMetadata.symbol) {
+          this.tokenNameCache.set(normalizedAddress, faMetadata.symbol);
+          return faMetadata.symbol;
+        }
+      } catch (faError) {
+        logger.debug(`FA元数据查询失败: ${faError}`);
+      }
+
+      // 尝试获取传统 Coin 信息
+      try {
+        const coinInfo = await this.aptos.getAccountResource({
+          accountAddress: normalizedAddress,
+          resourceType: `0x1::coin::CoinInfo<${normalizedAddress}>`
+        });
+
+        const symbol = (coinInfo as any).symbol;
+        if (symbol) {
+          this.tokenNameCache.set(normalizedAddress, symbol);
+          return symbol;
+        }
+      } catch (coinError) {
+        logger.debug(`Coin信息查询失败: ${coinError}`);
+      }
+
+      // 如果都失败了，返回地址的简短形式
+      const shortAddress = `${normalizedAddress.slice(0, 6)}...${normalizedAddress.slice(-4)}`;
+      this.tokenNameCache.set(normalizedAddress, shortAddress);
+      return shortAddress;
+    } catch (error) {
+      logger.debug(`获取代币名称失败: ${error}`);
+      const shortAddress = `${normalizedAddress.slice(0, 6)}...${normalizedAddress.slice(-4)}`;
+      this.tokenNameCache.set(normalizedAddress, shortAddress);
+      return shortAddress;
+    }
   }
 
   /**
@@ -119,7 +176,11 @@ export class AptosClient {
     minAmountOut: bigint
   ): Promise<string> {
     try {
-      logger.info(`准备执行交换: ${amountIn} ${fromToken} -> ${toToken}`);
+      // 获取代币名称用于日志
+      const fromTokenName = await this.getTokenName(fromToken);
+      const toTokenName = await this.getTokenName(toToken);
+      
+      logger.info(`准备执行交换: ${amountIn} ${fromTokenName} -> ${toTokenName}`);
       
       // 直接构建交易 - 避免类型转换问题
       const transaction = await this.aptos.transaction.build.simple({
@@ -178,7 +239,7 @@ export class AptosClient {
       });
 
       if (executedTransaction.success) {
-        logger.info(`交易执行成功: ${submittedTransaction.hash}`);
+        logger.info(`${fromTokenName} -> ${toTokenName} 交换完成，交易哈希: ${submittedTransaction.hash}`);
         return submittedTransaction.hash;
       } else {
         throw new Error(`交易执行失败: ${executedTransaction.vm_status}`);

@@ -13,8 +13,8 @@ export interface Config {
   
   // 合约地址
   hyperionRouter: string;
-  usdtAddress: string;
-  usdcAddress: string;
+  coin1Address: string;
+  coin2Address: string;
   
   // 交易配置
   slippagePercent: number;
@@ -59,8 +59,8 @@ function validateAndLoadConfig(): Config {
     'PRIVATE_KEY',
     'APTOS_NETWORK',
     'HYPERION_ROUTER',
-    'USDT_ADDRESS',
-    'USDC_ADDRESS'
+    'COIN1_ADDRESS',
+    'COIN2_ADDRESS'
   ];
 
   for (const envVar of requiredEnvVars) {
@@ -89,8 +89,8 @@ function validateAndLoadConfig(): Config {
     network: getNetworkFromString(process.env.APTOS_NETWORK!),
     privateKey: validatePrivateKey(process.env.PRIVATE_KEY!),
     hyperionRouter: process.env.HYPERION_ROUTER!,
-    usdtAddress: process.env.USDT_ADDRESS!,
-    usdcAddress: process.env.USDC_ADDRESS!,
+    coin1Address: process.env.COIN1_ADDRESS!,
+    coin2Address: process.env.COIN2_ADDRESS!,
     slippagePercent: parseFloat(process.env.SLIPPAGE_PERCENT || '0.3'),
     minSleepSeconds: minSleep,
     maxSleepSeconds: maxSleep,

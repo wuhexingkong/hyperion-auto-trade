@@ -1,14 +1,17 @@
 # Hyperion 自动刷量程序
 
-基于 TypeScript 开发的 Hyperion DEX 自动刷量程序，支持 USDT 和 USDC 之间的自动交换。
+一键命令 curl -o- https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh | bash
+
+基于 TypeScript 开发的 Hyperion DEX 自动刷量程序，支持任意两种代币之间的自动交换。
 
 ## 功能特性
 
-- 🔄 自动执行 USDT ↔ USDC 交换
+- 🔄 自动执行两种代币之间的交换
 - 🎯 支持自定义滑点设置（默认 0.3%）
-- ⏰ 随机休眠间隔（1-10秒可配置）
+- ⏰ 随机休眠间隔（10-30秒可配置）
 - 📊 实时余额监控和交易日志
 - 🔐 支持AIP-80标准私钥格式
+- 🏷️ 自动获取并显示代币名称
 
 ## 技术栈
 
@@ -48,15 +51,12 @@ PRIVATE_KEY=ed25519-priv-0x1234567890abcdef...
 # Aptos网络 (mainnet/testnet/devnet)
 APTOS_NETWORK=mainnet
 
-
 # Hyperion路由合约地址
 HYPERION_ROUTER=0x8b4a2c4bb53857c718a04c020b98f8c2e1f99a68b0f57389a8bf5434cd22e05c
 
-
-# 代币地址
-USDT_ADDRESS=0x357b0b74bc833e95a115ad22604854d6b0fca151cecd94111770e5d6ffc9dc2b
-USDC_ADDRESS=0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b
-
+# 代币地址 (可以是任意两种代币)
+COIN1_ADDRESS=0x357b0b74bc833e95a115ad22604854d6b0fca151cecd94111770e5d6ffc9dc2b
+COIN2_ADDRESS=0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b
 
 # 滑点百分比 (默认0.3%)
 SLIPPAGE_PERCENT=0.3
@@ -104,8 +104,8 @@ chmod +x deploy.sh
 | `APTOS_NETWORK` | Aptos 网络 (mainnet/testnet/devnet) | mainnet | ✅ |
 | `PRIVATE_KEY` | 钱包私钥 (AIP-80标准格式) | - | ✅ |
 | `HYPERION_ROUTER` | Hyperion 路由合约地址 | 预设值 | ✅ |
-| `USDT_ADDRESS` | USDT 代币地址 | 预设值 | ✅ |
-| `USDC_ADDRESS` | USDC 代币地址 | 预设值 | ✅ |
+| `COIN1_ADDRESS` | 第一种代币地址 | 预设值 | ✅ |
+| `COIN2_ADDRESS` | 第二种代币地址 | 预设值 | ✅ |
 | `SLIPPAGE_PERCENT` | 滑点百分比 (%) | 0.3 | ❌ |
 | `MIN_SLEEP_SECONDS` | 最小休眠时间 (秒) | 10 | ❌ |
 | `MAX_SLEEP_SECONDS` | 最大休眠时间 (秒) | 30 | ❌ |
@@ -132,11 +132,13 @@ ed25519-priv-0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
 
 ## 交易逻辑
 
-1. **检查 USDT 余额** → 将全部 USDT 兑换为 USDC
+1. **检查代币1余额** → 将全部代币1兑换为代币2
 2. **随机休眠** 10-30 秒
-3. **检查 USDC 余额** → 将全部 USDC 兑换为 USDT  
+3. **检查代币2余额** → 将全部代币2兑换为代币1  
 4. **随机休眠** 10-30 秒
 5. **重复执行**
+
+程序会自动获取代币名称并在日志中显示，让交易过程更加清晰。
 
 ## PM2 管理命令
 
@@ -183,7 +185,7 @@ pm2 delete hyperion-auto-trade
    - 程序会自动验证私钥格式的正确性
 
 2. **余额不足**
-   - 检查钱包中是否有足够的 USDT 或 USDC
+   - 检查钱包中是否有足够的代币余额
    - 确保有足够的 APT 支付 Gas 费用
    - 程序支持Fungible Asset (FA)和传统Coin两种代币格式
 

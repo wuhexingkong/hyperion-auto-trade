@@ -19,17 +19,21 @@ export async function checkAllBalances(): Promise<void> {
       logger.error('获取账户信息失败', error as Error);
     }
 
-    // 检查USDT余额
-    logger.info('\n--- USDT 余额检查 ---');
-    logger.info(`USDT地址: ${config.usdtAddress}`);
-    const usdtBalance = await client.getTokenBalance(config.usdtAddress);
-    logger.info(`USDT余额: ${formatTokenAmount(usdtBalance)} (原始值: ${usdtBalance})`);
+    // 获取代币名称
+    const coin1Name = await client.getTokenName(config.coin1Address);
+    const coin2Name = await client.getTokenName(config.coin2Address);
 
-    // 检查USDC余额  
-    logger.info('\n--- USDC 余额检查 ---');
-    logger.info(`USDC地址: ${config.usdcAddress}`);
-    const usdcBalance = await client.getTokenBalance(config.usdcAddress);
-    logger.info(`USDC余额: ${formatTokenAmount(usdcBalance)} (原始值: ${usdcBalance})`);
+    // 检查Coin1余额
+    logger.info(`\n--- ${coin1Name} 余额检查 ---`);
+    logger.info(`${coin1Name}地址: ${config.coin1Address}`);
+    const coin1Balance = await client.getTokenBalance(config.coin1Address);
+    logger.info(`${coin1Name}余额: ${formatTokenAmount(coin1Balance)} (原始值: ${coin1Balance})`);
+
+    // 检查Coin2余额  
+    logger.info(`\n--- ${coin2Name} 余额检查 ---`);
+    logger.info(`${coin2Name}地址: ${config.coin2Address}`);
+    const coin2Balance = await client.getTokenBalance(config.coin2Address);
+    logger.info(`${coin2Name}余额: ${formatTokenAmount(coin2Balance)} (原始值: ${coin2Balance})`);
 
     logger.info('===================\n');
   } catch (error) {
