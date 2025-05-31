@@ -350,8 +350,10 @@ configure_env() {
     # 输入私钥
     while true; do
         echo -n "请输入钱包私钥 (PRIVATE_KEY，必须以ed25519-priv-开头): "
-        read -r PRIVATE_KEY
-        if [[ $PRIVATE_KEY =~ ^ed25519-priv- ]]; then
+        read -s PRIVATE_KEY
+        echo  # 换行，因为read -s不会自动换行
+        
+        if [[ "$PRIVATE_KEY" =~ ^ed25519-priv- ]]; then
             break
         else
             log_error "私钥格式错误，必须以 ed25519-priv- 开头"
@@ -396,15 +398,50 @@ configure_env() {
     # 修改配置文件
     log_info "更新配置文件..."
     
-    # 使用sed替换配置值
-    sed -i "s|PRIVATE_KEY=.*|PRIVATE_KEY=$PRIVATE_KEY|" .env
-    sed -i "s|COIN1_ADDRESS=.*|COIN1_ADDRESS=$COIN1_ADDRESS|" .env
-    sed -i "s|COIN2_ADDRESS=.*|COIN2_ADDRESS=$COIN2_ADDRESS|" .env
-    sed -i "s|SLIPPAGE_PERCENT=.*|SLIPPAGE_PERCENT=$SLIPPAGE_PERCENT|" .env
-    sed -i "s|MIN_SLEEP_SECONDS=.*|MIN_SLEEP_SECONDS=$MIN_SLEEP_SECONDS|" .env
-    sed -i "s|MAX_SLEEP_SECONDS=.*|MAX_SLEEP_SECONDS=$MAX_SLEEP_SECONDS|" .env
+    # 使用更安全的方式替换配置值，避免特殊字符问题
+    # 创建临时文件
+    TEMP_ENV=$(mktemp)
+    
+    # 逐行处理配置文件
+    while IFS= read -r line; do
+        case "$line" in
+            PRIVATE_KEY=*)
+                echo "PRIVATE_KEY=$PRIVATE_KEY" >> "$TEMP_ENV"
+                ;;
+            COIN1_ADDRESS=*)
+                echo "COIN1_ADDRESS=$COIN1_ADDRESS" >> "$TEMP_ENV"
+                ;;
+            COIN2_ADDRESS=*)
+                echo "COIN2_ADDRESS=$COIN2_ADDRESS" >> "$TEMP_ENV"
+                ;;
+            SLIPPAGE_PERCENT=*)
+                echo "SLIPPAGE_PERCENT=$SLIPPAGE_PERCENT" >> "$TEMP_ENV"
+                ;;
+            MIN_SLEEP_SECONDS=*)
+                echo "MIN_SLEEP_SECONDS=$MIN_SLEEP_SECONDS" >> "$TEMP_ENV"
+                ;;
+            MAX_SLEEP_SECONDS=*)
+                echo "MAX_SLEEP_SECONDS=$MAX_SLEEP_SECONDS" >> "$TEMP_ENV"
+                ;;
+            *)
+                echo "$line" >> "$TEMP_ENV"
+                ;;
+        esac
+    done < .env
+    
+    # 替换原文件
+    mv "$TEMP_ENV" .env
     
     log_info "配置文件更新完成"
+    
+    # 验证配置文件（不显示私钥）
+    log_info "配置验证："
+    echo "  COIN1_ADDRESS: $COIN1_ADDRESS"
+    echo "  COIN2_ADDRESS: $COIN2_ADDRESS"
+    echo "  SLIPPAGE_PERCENT: $SLIPPAGE_PERCENT%"
+    echo "  MIN_SLEEP_SECONDS: ${MIN_SLEEP_SECONDS}s"
+    echo "  MAX_SLEEP_SECONDS: ${MAX_SLEEP_SECONDS}s"
+    echo "  PRIVATE_KEY: [已设置，长度: ${#PRIVATE_KEY} 字符]"
 }
 
 # 部署项目
