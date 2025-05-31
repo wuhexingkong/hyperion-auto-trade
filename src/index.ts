@@ -1,7 +1,6 @@
-import { config } from './config/index.js';
-import { logger } from './utils/logger.js';
-import { TradingService } from './services/tradingService.js';
-import { BalanceChecker } from './utils/balanceChecker.js';
+import { TradingService } from './services/tradingService';
+import { logger } from './utils/logger';
+import { config } from './config';
 
 // 全局变量
 let tradingService: TradingService;
@@ -44,16 +43,16 @@ function setupGracefulShutdown(): void {
  * 显示启动信息
  */
 function displayStartupInfo(): void {
-  logger.info('🚀 启动 Hyperion 自动刷量程序');
-  logger.info('=====================================');
-  
-  // 显示配置信息
-  logger.info('📋 配置信息:');
-  logger.info(`  USDT地址: ${config.usdtAddress}`);
-  logger.info(`  USDC地址: ${config.usdcAddress}`);
-  logger.info(`  滑点设置: ${config.slippagePercent}%`);
-  logger.info(`  休眠间隔: ${config.minSleepSeconds}-${config.maxSleepSeconds}秒`);
-  logger.info('=====================================');
+  logger.info('='.repeat(60));
+  logger.info('🚀 Hyperion 自动刷量程序');
+  logger.info('='.repeat(60));
+  logger.info(`网络: ${config.network}`);
+  logger.info(`滑点设置: ${config.slippagePercent}%`);
+  logger.info(`休眠间隔: ${config.minSleepSeconds}-${config.maxSleepSeconds}秒`);
+  logger.info(`USDT地址: ${config.usdtAddress}`);
+  logger.info(`USDC地址: ${config.usdcAddress}`);
+  logger.info(`Hyperion路由: ${config.hyperionRouter}`);
+  logger.info('='.repeat(60));
 }
 
 /**
@@ -66,18 +65,6 @@ async function main(): Promise<void> {
     
     // 设置优雅关闭
     setupGracefulShutdown();
-    
-    // 检查余额
-    const balanceChecker = new BalanceChecker();
-    await balanceChecker.checkAllBalances();
-    
-    // 检查是否有足够余额
-    const hasBalance = await balanceChecker.hasEnoughBalance();
-    if (!hasBalance) {
-      logger.error('❌ 钱包中没有USDT或USDC余额，无法开始交易');
-      logger.info('请确保钱包中有足够的代币余额后重新启动程序');
-      process.exit(1);
-    }
     
     // 创建交易服务
     tradingService = new TradingService();

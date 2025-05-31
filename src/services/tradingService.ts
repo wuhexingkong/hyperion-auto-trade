@@ -1,44 +1,19 @@
-import { config } from '../config/index.js';
-import { logger } from '../utils/logger.js';
-import { AptosClient } from './aptosClient.js';
-import { BalanceChecker } from '../utils/balanceChecker.js';
+import { AptosClient } from './aptosClient';
+import { config } from '../config';
+import { logger } from '../utils/logger';
 import { 
   sleep, 
   formatTokenAmount 
 } from '../utils/helpers';
+import { checkAllBalances } from '../utils/balanceChecker';
 
 export class TradingService {
   private aptosClient: AptosClient;
-  private balanceChecker: BalanceChecker;
   private isRunning: boolean = false;
   private cycleCount: number = 0;
-  private usdtName: string = '';
-  private usdcName: string = '';
 
   constructor() {
-    // 创建AptosClient实例
     this.aptosClient = new AptosClient();
-    
-    // 创建BalanceChecker实例
-    this.balanceChecker = new BalanceChecker();
-    
-    logger.info(`交易账户地址: ${this.aptosClient.getAccountAddress()}`);
-  }
-
-  /**
-   * 初始化代币名称
-   */
-  private async initializeTokenNames(): Promise<void> {
-    try {
-      this.usdtName = await this.aptosClient.getTokenName(config.usdtAddress);
-      this.usdcName = await this.aptosClient.getTokenName(config.usdcAddress);
-      logger.info(`代币1: ${this.usdtName} (${config.usdtAddress})`);
-      logger.info(`代币2: ${this.usdcName} (${config.usdcAddress})`);
-    } catch (error) {
-      logger.warn(`获取代币名称失败，将使用地址简称: ${error}`);
-      this.usdtName = 'USDT';
-      this.usdcName = 'USDC';
-    }
   }
 
   /**
@@ -56,11 +31,8 @@ export class TradingService {
     logger.info(`休眠间隔: ${config.minSleepSeconds}-${config.maxSleepSeconds}秒`);
 
     try {
-      // 初始化代币名称
-      await this.initializeTokenNames();
-      
       // 详细余额检查
-      await this.balanceChecker.checkAllBalances();
+      await checkAllBalances();
 
       while (this.isRunning) {
         this.cycleCount++;
@@ -72,7 +44,7 @@ export class TradingService {
           const usdcBalance = await this.aptosClient.getTokenBalance(config.usdcAddress);
           
           if (usdtBalance === 0n && usdcBalance === 0n) {
-            logger.error(`钱包中没有${this.usdtName}或${this.usdcName}余额，无法进行交易`);
+            logger.error('钱包中没有USDT或USDC余额，无法进行交易');
             logger.info('等待60秒后重新检查...');
             await sleep(60);
             continue;
@@ -80,7 +52,7 @@ export class TradingService {
 
           // 优先交换余额较多的代币
           if (usdtBalance > 0n) {
-            await this.swapUsdtToUsdc(usdtBalance);
+            await this.swapUsdtToUsdc();
             await this.randomSleep();
           }
           
@@ -88,7 +60,7 @@ export class TradingService {
             // 重新获取USDC余额（可能刚刚从USDT换来）
             const currentUsdcBalance = await this.aptosClient.getTokenBalance(config.usdcAddress);
             if (currentUsdcBalance > 0n) {
-              await this.swapUsdcToUsdt(currentUsdcBalance);
+              await this.swapUsdcToUsdt();
               await this.randomSleep();
             }
           }
@@ -97,75 +69,90 @@ export class TradingService {
 
         } catch (error) {
           logger.error(`第 ${this.cycleCount} 轮交易失败`, error as Error);
-          logger.info('等待30秒后继续下一轮...');
+          
+          // 交易失败时等待更长时间再重试
+          logger.info('等待30秒后重试...');
           await sleep(30);
         }
       }
     } catch (error) {
-      logger.error('交易服务启动失败', error as Error);
+      logger.error('交易服务异常', error as Error);
+    } finally {
       this.isRunning = false;
-      throw error;
+      logger.info('自动交易已停止');
     }
   }
 
   /**
-   * 停止交易
+   * 停止自动交易
    */
   stopTrading(): void {
-    logger.info('正在停止交易...');
-    this.isRunning = false;
-  }
-
-  /**
-   * 执行 USDT -> USDC 交易
-   */
-  async swapUsdtToUsdc(amount: bigint): Promise<boolean> {
-    try {
-      logger.info(`开始执行 USDT -> USDC 交易，数量: ${amount}`);
-      
-      // 计算最小输出金额（考虑滑点）
-      const minAmountOut = this.calculateMinAmountOut(amount);
-      
-      // 使用 aptosClient 的 executeSwap 方法
-      const txHash = await this.aptosClient.executeSwap(
-        config.usdtAddress,
-        config.usdcAddress,
-        amount,
-        minAmountOut
-      );
-
-      logger.info(`USDT -> USDC 交易成功，交易哈希: ${txHash}`);
-      return true;
-    } catch (error) {
-      logger.error(`USDT -> USDC 交易异常:`, error as Error);
-      return false;
+    if (this.isRunning) {
+      logger.info('正在停止自动交易...');
+      this.isRunning = false;
     }
   }
 
   /**
-   * 执行 USDC -> USDT 交易
+   * USDT -> USDC 交换
    */
-  async swapUsdcToUsdt(amount: bigint): Promise<boolean> {
-    try {
-      logger.info(`开始执行 USDC -> USDT 交易，数量: ${amount}`);
-      
-      // 计算最小输出金额（考虑滑点）
-      const minAmountOut = this.calculateMinAmountOut(amount);
-      
-      // 使用 aptosClient 的 executeSwap 方法
-      const txHash = await this.aptosClient.executeSwap(
-        config.usdcAddress,
-        config.usdtAddress,
-        amount,
-        minAmountOut
-      );
+  private async swapUsdtToUsdc(): Promise<void> {
+    logger.info('执行 USDT -> USDC 交换');
 
-      logger.info(`USDC -> USDT 交易成功，交易哈希: ${txHash}`);
-      return true;
-    } catch (error) {
-      logger.error(`USDC -> USDT 交易异常:`, error as Error);
-      return false;
+    // 获取USDT余额
+    const usdtBalance = await this.aptosClient.getTokenBalance(config.usdtAddress);
+    
+    if (usdtBalance === 0n) {
+      throw new Error('USDT余额为0，无法执行交换');
     }
+
+    logger.info(`USDT余额: ${formatTokenAmount(usdtBalance)} USDT`);
+
+    // 计算最小输出金额（考虑滑点）
+    const minAmountOut = this.calculateMinAmountOut(usdtBalance);
+    
+    logger.info(`预期最小输出: ${formatTokenAmount(minAmountOut)} USDC`);
+
+    // 执行交换
+    const txHash = await this.aptosClient.executeSwap(
+      config.usdtAddress,
+      config.usdcAddress,
+      usdtBalance,
+      minAmountOut
+    );
+
+    logger.info(`USDT -> USDC 交换完成，交易哈希: ${txHash}`);
+  }
+
+  /**
+   * USDC -> USDT 交换
+   */
+  private async swapUsdcToUsdt(): Promise<void> {
+    logger.info('执行 USDC -> USDT 交换');
+
+    // 获取USDC余额
+    const usdcBalance = await this.aptosClient.getTokenBalance(config.usdcAddress);
+    
+    if (usdcBalance === 0n) {
+      throw new Error('USDC余额为0，无法执行交换');
+    }
+
+    logger.info(`USDC余额: ${formatTokenAmount(usdcBalance)} USDC`);
+
+    // 计算最小输出金额（考虑滑点）
+    const minAmountOut = this.calculateMinAmountOut(usdcBalance);
+    
+    logger.info(`预期最小输出: ${formatTokenAmount(minAmountOut)} USDT`);
+
+    // 执行交换
+    const txHash = await this.aptosClient.executeSwap(
+      config.usdcAddress,
+      config.usdtAddress,
+      usdcBalance,
+      minAmountOut
+    );
+
+    logger.info(`USDC -> USDT 交换完成，交易哈希: ${txHash}`);
   }
 
   /**
@@ -180,13 +167,16 @@ export class TradingService {
 
   /**
    * 随机休眠
+   * @param minSeconds 最小秒数
+   * @param maxSeconds 最大秒数
    */
-  private async randomSleep(): Promise<void> {
-    const sleepTime = Math.floor(
-      Math.random() * (config.maxSleepSeconds - config.minSleepSeconds + 1) + config.minSleepSeconds
-    );
+  private async randomSleep(minSeconds?: number, maxSeconds?: number): Promise<void> {
+    const min = minSeconds || config.minSleepSeconds;
+    const max = maxSeconds || config.maxSleepSeconds;
+    const sleepTime = Math.floor(Math.random() * (max - min + 1)) + min;
+    
     logger.info(`休眠 ${sleepTime} 秒...`);
-    await sleep(sleepTime);
+    await new Promise(resolve => setTimeout(resolve, sleepTime * 1000));
   }
 
   /**
@@ -198,8 +188,8 @@ export class TradingService {
       const usdcBalance = await this.aptosClient.getTokenBalance(config.usdcAddress);
 
       logger.info('\n=== 当前余额 ===');
-      logger.info(`${this.usdtName}: ${formatTokenAmount(usdtBalance)}`);
-      logger.info(`${this.usdcName}: ${formatTokenAmount(usdcBalance)}`);
+      logger.info(`USDT: ${formatTokenAmount(usdtBalance)}`);
+      logger.info(`USDC: ${formatTokenAmount(usdcBalance)}`);
       logger.info(`钱包地址: ${this.aptosClient.getAccountAddress()}`);
       logger.info('================\n');
     } catch (error) {
