@@ -2,6 +2,9 @@
 
 一个基于 Aptos 区块链的 Hyperion DEX 自动刷量程序，专门用于 **USDT/USDC 交易对**的自动化交易。
 
+## 风险提示！
+代码是结合AI生成的，使用前请使用少量资金测试后再使用。
+
 ## ✨ 特性
 
 - 🔄 **专业刷量**: 专门针对 USDT/USDC 交易对优化
@@ -173,9 +176,6 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 nvm use 22.14.0
 
-# 方法3: 运行修复脚本
-cd /opt/hyperion-auto-trade
-./fix-pm2-env.sh
 ```
 
 ### 常见问题
@@ -229,5 +229,3 @@ cd /opt/hyperion-auto-trade
 本程序仅供学习和研究使用。使用本程序进行实际交易的风险由用户自行承担。开发者不对因使用本程序而导致的任何损失负责。
 
 ---
-
-**⭐ 如果这个项目对您有帮助，请给个 Star！** 
