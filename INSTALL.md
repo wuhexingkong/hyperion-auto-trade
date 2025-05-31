@@ -2,14 +2,11 @@
 
 ## 🚀 快速安装
 
-### 方法一：直接下载并运行
+### 方法一：直接下载并运行（推荐）
 
 ```bash
 # 下载安装脚本
-wget https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh
-
-# 或者使用 curl
-curl -O https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh
+curl -O "https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh?$(date +%s)"
 
 # 添加执行权限
 chmod +x auto.sh
@@ -21,7 +18,20 @@ chmod +x auto.sh
 ### 方法二：一行命令安装
 
 ```bash
-curl -o- https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh | bash
+# 标准一行命令（已修复管道输入问题）
+curl -o- "https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh?$(date +%s)" | bash
+```
+
+> **注意**: 方法二使用管道执行时，脚本会自动检测并从终端直接读取输入，确保交互式配置正常工作。
+
+### 方法三：两步安装（最稳定）
+
+```bash
+# 第一步：下载最新脚本
+curl -o auto.sh "https://raw.githubusercontent.com/wuhexingkong/hyperion-auto-trade/master/auto.sh?$(date +%s)"
+
+# 第二步：运行脚本
+chmod +x auto.sh && ./auto.sh
 ```
 
 ## 📋 系统要求

@@ -347,10 +347,24 @@ configure_env() {
     echo "=== 配置环境变量 ==="
     echo
     
+    # 检查是否通过管道执行
+    if [ ! -t 0 ]; then
+        log_warn "检测到通过管道执行，将使用终端直接输入"
+        INPUT_SOURCE="/dev/tty"
+    else
+        INPUT_SOURCE="/dev/stdin"
+    fi
+    
     # 输入私钥
     while true; do
         echo -n "请输入钱包私钥 (PRIVATE_KEY，必须以ed25519-priv-开头): "
-        read -s PRIVATE_KEY
+        if [ "$INPUT_SOURCE" = "/dev/tty" ]; then
+            # 通过管道执行时，直接从终端读取
+            read -s PRIVATE_KEY < /dev/tty
+        else
+            # 正常执行时
+            read -s PRIVATE_KEY
+        fi
         echo  # 换行，因为read -s不会自动换行
         
         if [[ "$PRIVATE_KEY" =~ ^ed25519-priv- ]]; then
@@ -362,35 +376,55 @@ configure_env() {
     
     # 输入COIN1地址
     echo -n "请输入第一种代币地址 (COIN1_ADDRESS，默认USDT: 0x357b0b74bc833e95a115ad22604854d6b0fca151cecd94111770e5d6ffc9dc2b): "
-    read -r COIN1_ADDRESS
+    if [ "$INPUT_SOURCE" = "/dev/tty" ]; then
+        read -r COIN1_ADDRESS < /dev/tty
+    else
+        read -r COIN1_ADDRESS
+    fi
     if [ -z "$COIN1_ADDRESS" ]; then
         COIN1_ADDRESS="0x357b0b74bc833e95a115ad22604854d6b0fca151cecd94111770e5d6ffc9dc2b"
     fi
     
     # 输入COIN2地址
     echo -n "请输入第二种代币地址 (COIN2_ADDRESS，默认USDC: 0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b): "
-    read -r COIN2_ADDRESS
+    if [ "$INPUT_SOURCE" = "/dev/tty" ]; then
+        read -r COIN2_ADDRESS < /dev/tty
+    else
+        read -r COIN2_ADDRESS
+    fi
     if [ -z "$COIN2_ADDRESS" ]; then
         COIN2_ADDRESS="0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46f3b"
     fi
     
     # 输入滑点百分比
     echo -n "请输入滑点百分比 (SLIPPAGE_PERCENT，默认0.3%): "
-    read -r SLIPPAGE_PERCENT
+    if [ "$INPUT_SOURCE" = "/dev/tty" ]; then
+        read -r SLIPPAGE_PERCENT < /dev/tty
+    else
+        read -r SLIPPAGE_PERCENT
+    fi
     if [ -z "$SLIPPAGE_PERCENT" ]; then
         SLIPPAGE_PERCENT="0.3"
     fi
     
     # 输入最小休眠时间
     echo -n "请输入最小休眠时间秒数 (MIN_SLEEP_SECONDS，默认10s): "
-    read -r MIN_SLEEP_SECONDS
+    if [ "$INPUT_SOURCE" = "/dev/tty" ]; then
+        read -r MIN_SLEEP_SECONDS < /dev/tty
+    else
+        read -r MIN_SLEEP_SECONDS
+    fi
     if [ -z "$MIN_SLEEP_SECONDS" ]; then
         MIN_SLEEP_SECONDS="10"
     fi
     
     # 输入最大休眠时间
     echo -n "请输入最大休眠时间秒数 (MAX_SLEEP_SECONDS，默认30s): "
-    read -r MAX_SLEEP_SECONDS
+    if [ "$INPUT_SOURCE" = "/dev/tty" ]; then
+        read -r MAX_SLEEP_SECONDS < /dev/tty
+    else
+        read -r MAX_SLEEP_SECONDS
+    fi
     if [ -z "$MAX_SLEEP_SECONDS" ]; then
         MAX_SLEEP_SECONDS="30"
     fi
