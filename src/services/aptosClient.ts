@@ -137,8 +137,8 @@ export class AptosClient {
             amountIn.toString(),
             // min_amount_out - 字符串
             minAmountOut.toString(),
-            // referrer - 地址字符串
-            normalizeAddress("0x910aeaa9a8effcf80bb7dbad0f209f25f5469cb04c1ee3c68161e070d3c6ccf6")
+            // referrer - 使用当前钱包地址
+            this.account.accountAddress
           ]
         }
       });
