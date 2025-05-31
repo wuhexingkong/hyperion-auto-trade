@@ -32,13 +32,19 @@ log_step() {
 # 检查是否为root用户
 check_root() {
     if [[ $EUID -eq 0 ]]; then
-        log_warn "检测到以root用户运行，建议使用普通用户运行此脚本"
-        read -p "是否继续？(y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
-        fi
+        log_warn "检测到以root用户运行"
+        log_info "将以root用户身份安装，请确保这是您想要的"
+        
+        # 设置默认用户为root
+        INSTALL_USER="root"
+        INSTALL_HOME="/root"
+    else
+        INSTALL_USER="$USER"
+        INSTALL_HOME="$HOME"
     fi
+    
+    log_info "安装用户: $INSTALL_USER"
+    log_info "用户主目录: $INSTALL_HOME"
 }
 
 # 检查系统兼容性
@@ -78,12 +84,19 @@ check_system() {
 update_system() {
     log_step "更新系统包列表..."
     
+    # 根据用户权限决定是否使用sudo
+    if [[ $EUID -eq 0 ]]; then
+        SUDO_CMD=""
+    else
+        SUDO_CMD="sudo"
+    fi
+    
     # 更新包列表
-    sudo apt update
+    $SUDO_CMD apt update
     
     # 安装基础依赖
     log_info "安装基础依赖包..."
-    sudo apt install -y curl wget build-essential software-properties-common
+    $SUDO_CMD apt install -y curl wget build-essential software-properties-common
     
     # 检查网络连接
     if ! curl -s --connect-timeout 10 https://www.google.com > /dev/null; then
@@ -130,14 +143,14 @@ install_nodejs() {
     log_step "安装NVM和Node.js v22.14.0..."
     
     # 检查NVM是否已安装
-    if ! command -v nvm &> /dev/null && [ ! -s "$HOME/.nvm/nvm.sh" ]; then
+    if ! command -v nvm &> /dev/null && [ ! -s "$INSTALL_HOME/.nvm/nvm.sh" ]; then
         log_info "安装NVM v0.40.3..."
         
         # 使用官方推荐的安装命令
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
         
         # 重新加载bash配置
-        export NVM_DIR="$HOME/.nvm"
+        export NVM_DIR="$INSTALL_HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
         
@@ -151,7 +164,7 @@ install_nodejs() {
     else
         log_info "NVM 已安装，跳过安装步骤"
         # 确保NVM已加载
-        export NVM_DIR="$HOME/.nvm"
+        export NVM_DIR="$INSTALL_HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
     fi
@@ -183,8 +196,8 @@ install_nodejs() {
     # 添加NVM到当前会话的PATH（如果需要）
     if ! command -v node &> /dev/null; then
         log_info "重新加载NVM环境..."
-        source "$HOME/.bashrc" 2>/dev/null || true
-        source "$HOME/.profile" 2>/dev/null || true
+        source "$INSTALL_HOME/.bashrc" 2>/dev/null || true
+        source "$INSTALL_HOME/.profile" 2>/dev/null || true
     fi
 }
 
@@ -196,7 +209,7 @@ check_install_git() {
         log_info "Git 已安装，版本: $(git --version)"
     else
         log_info "安装Git..."
-        sudo apt install -y git
+        $SUDO_CMD apt install -y git
         log_info "Git 安装完成，版本: $(git --version)"
     fi
 }
@@ -221,7 +234,15 @@ check_install_pm2() {
         log_info "PM2 已安装，版本: $(pm2 -v)"
     else
         log_info "安装PM2..."
-        npm install -g pm2
+        
+        # 根据用户权限决定安装方式
+        if [[ $EUID -eq 0 ]]; then
+            # root用户全局安装
+            npm install -g pm2
+        else
+            # 普通用户也全局安装（npm会处理权限）
+            npm install -g pm2
+        fi
         
         # 验证PM2安装
         if command -v pm2 &> /dev/null; then
@@ -240,18 +261,29 @@ setup_project() {
     PROJECT_DIR="/opt/hyperion-auto-trade"
     
     # 检查/opt目录权限
-    if [ ! -w "/opt" ] && [ ! -d "$PROJECT_DIR" ]; then
+    if [ ! -w "/opt" ] && [ ! -d "$PROJECT_DIR" ] && [[ $EUID -ne 0 ]]; then
         log_info "需要sudo权限创建 $PROJECT_DIR 目录"
     fi
     
     # 强制创建目录
     if [ -d "$PROJECT_DIR" ]; then
         log_warn "目录 $PROJECT_DIR 已存在，将删除并重新创建"
-        sudo rm -rf "$PROJECT_DIR"
+        if [[ $EUID -eq 0 ]]; then
+            rm -rf "$PROJECT_DIR"
+        else
+            sudo rm -rf "$PROJECT_DIR"
+        fi
     fi
     
-    sudo mkdir -p "$PROJECT_DIR"
-    sudo chown $USER:$USER "$PROJECT_DIR"
+    # 创建目录
+    if [[ $EUID -eq 0 ]]; then
+        mkdir -p "$PROJECT_DIR"
+        # root用户直接拥有目录
+    else
+        sudo mkdir -p "$PROJECT_DIR"
+        sudo chown $INSTALL_USER:$INSTALL_USER "$PROJECT_DIR"
+    fi
+    
     cd "$PROJECT_DIR"
     
     log_info "克隆项目代码..."
@@ -291,6 +323,15 @@ setup_project() {
     
     # 给deploy.sh执行权限
     chmod +x deploy.sh
+    
+    # 确保目录权限正确
+    if [[ $EUID -eq 0 ]]; then
+        # root用户拥有所有文件
+        chown -R root:root "$PROJECT_DIR"
+    else
+        # 普通用户需要sudo设置权限
+        sudo chown -R $INSTALL_USER:$INSTALL_USER "$PROJECT_DIR"
+    fi
     
     log_info "项目代码克隆完成，所有必要文件已验证"
 }
@@ -415,6 +456,7 @@ show_completion() {
     echo "========================================"
     echo
     echo "项目目录: /opt/hyperion-auto-trade"
+    echo "安装用户: $INSTALL_USER"
     echo
     echo "常用命令："
     echo "  查看状态: pm2 status"
@@ -427,6 +469,20 @@ show_completion() {
     echo "  完整日志: /opt/hyperion-auto-trade/logs/hyperion.log"
     echo "  错误日志: /opt/hyperion-auto-trade/logs/error.log"
     echo "  输出日志: /opt/hyperion-auto-trade/logs/out.log"
+    echo
+    
+    # 根据用户类型提供不同的提示
+    if [[ $EUID -eq 0 ]]; then
+        log_warn "⚠️  Root用户运行提醒："
+        echo "  1. 程序以root权限运行，请确保这是必要的"
+        echo "  2. 建议定期检查程序运行状态和安全性"
+        echo "  3. 如需切换到普通用户运行，请重新安装"
+    else
+        log_warn "⚠️  普通用户运行提醒："
+        echo "  1. 程序以普通用户权限运行，安全性较好"
+        echo "  2. 如需修改系统级配置，可能需要sudo权限"
+    fi
+    
     echo
     log_warn "⚠️  重要提醒："
     echo "  1. 请确保钱包中有足够的代币余额"
