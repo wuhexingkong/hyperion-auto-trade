@@ -1,4 +1,3 @@
-import { Account, Aptos, AptosConfig, Network, Ed25519PrivateKey } from '@aptos-labs/ts-sdk';
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 import { AptosClient } from './aptosClient.js';
@@ -9,8 +8,6 @@ import {
 } from '../utils/helpers';
 
 export class TradingService {
-  private aptos: Aptos;
-  private account: Account;
   private aptosClient: AptosClient;
   private balanceChecker: BalanceChecker;
   private isRunning: boolean = false;
@@ -19,20 +16,13 @@ export class TradingService {
   private usdcName: string = '';
 
   constructor() {
-    const aptosConfig = new AptosConfig({ network: Network.MAINNET });
-    this.aptos = new Aptos(aptosConfig);
-    
-    // 创建账户
-    const privateKey = new Ed25519PrivateKey(config.privateKey);
-    this.account = Account.fromPrivateKey({ privateKey });
-    
     // 创建AptosClient实例
     this.aptosClient = new AptosClient();
     
     // 创建BalanceChecker实例
     this.balanceChecker = new BalanceChecker();
     
-    logger.info(`交易账户地址: ${this.account.accountAddress.toString()}`);
+    logger.info(`交易账户地址: ${this.aptosClient.getAccountAddress()}`);
   }
 
   /**
@@ -133,35 +123,19 @@ export class TradingService {
     try {
       logger.info(`开始执行 USDT -> USDC 交易，数量: ${amount}`);
       
-      const transaction = await this.aptos.transaction.build.simple({
-        sender: this.account.accountAddress,
-        data: {
-          function: `${config.hyperionRouter}::router::swap_exact_input`,
-          functionArguments: [
-            config.usdtAddress,  // from token
-            config.usdcAddress,  // to token  
-            amount.toString(),   // amount in
-            "0",                 // min amount out (会根据滑点计算)
-          ],
-        },
-      });
+      // 计算最小输出金额（考虑滑点）
+      const minAmountOut = this.calculateMinAmountOut(amount);
+      
+      // 使用 aptosClient 的 executeSwap 方法
+      const txHash = await this.aptosClient.executeSwap(
+        config.usdtAddress,
+        config.usdcAddress,
+        amount,
+        minAmountOut
+      );
 
-      const committedTxn = await this.aptos.signAndSubmitTransaction({
-        signer: this.account,
-        transaction,
-      });
-
-      const executedTransaction = await this.aptos.waitForTransaction({
-        transactionHash: committedTxn.hash,
-      });
-
-      if (executedTransaction.success) {
-        logger.info(`USDT -> USDC 交易成功，交易哈希: ${committedTxn.hash}`);
-        return true;
-      } else {
-        logger.error(`USDT -> USDC 交易失败: ${JSON.stringify(executedTransaction)}`);
-        return false;
-      }
+      logger.info(`USDT -> USDC 交易成功，交易哈希: ${txHash}`);
+      return true;
     } catch (error) {
       logger.error(`USDT -> USDC 交易异常:`, error as Error);
       return false;
@@ -175,35 +149,19 @@ export class TradingService {
     try {
       logger.info(`开始执行 USDC -> USDT 交易，数量: ${amount}`);
       
-      const transaction = await this.aptos.transaction.build.simple({
-        sender: this.account.accountAddress,
-        data: {
-          function: `${config.hyperionRouter}::router::swap_exact_input`,
-          functionArguments: [
-            config.usdcAddress,  // from token
-            config.usdtAddress,  // to token
-            amount.toString(),   // amount in
-            "0",                 // min amount out (会根据滑点计算)
-          ],
-        },
-      });
+      // 计算最小输出金额（考虑滑点）
+      const minAmountOut = this.calculateMinAmountOut(amount);
+      
+      // 使用 aptosClient 的 executeSwap 方法
+      const txHash = await this.aptosClient.executeSwap(
+        config.usdcAddress,
+        config.usdtAddress,
+        amount,
+        minAmountOut
+      );
 
-      const committedTxn = await this.aptos.signAndSubmitTransaction({
-        signer: this.account,
-        transaction,
-      });
-
-      const executedTransaction = await this.aptos.waitForTransaction({
-        transactionHash: committedTxn.hash,
-      });
-
-      if (executedTransaction.success) {
-        logger.info(`USDC -> USDT 交易成功，交易哈希: ${committedTxn.hash}`);
-        return true;
-      } else {
-        logger.error(`USDC -> USDT 交易失败: ${JSON.stringify(executedTransaction)}`);
-        return false;
-      }
+      logger.info(`USDC -> USDT 交易成功，交易哈希: ${txHash}`);
+      return true;
     } catch (error) {
       logger.error(`USDC -> USDT 交易异常:`, error as Error);
       return false;
@@ -211,10 +169,13 @@ export class TradingService {
   }
 
   /**
-   * 获取账户地址
+   * 计算最小输出金额（考虑滑点）
+   * @param amountIn 输入金额
+   * @returns 最小输出金额
    */
-  getAccountAddress(): string {
-    return this.account.accountAddress.toString();
+  private calculateMinAmountOut(amountIn: bigint): bigint {
+    const slippageMultiplier = (100 - config.slippagePercent) / 100;
+    return BigInt(Math.floor(Number(amountIn) * slippageMultiplier));
   }
 
   /**
@@ -239,7 +200,7 @@ export class TradingService {
       logger.info('\n=== 当前余额 ===');
       logger.info(`${this.usdtName}: ${formatTokenAmount(usdtBalance)}`);
       logger.info(`${this.usdcName}: ${formatTokenAmount(usdcBalance)}`);
-      logger.info(`钱包地址: ${this.getAccountAddress()}`);
+      logger.info(`钱包地址: ${this.aptosClient.getAccountAddress()}`);
       logger.info('================\n');
     } catch (error) {
       logger.error('获取余额失败', error as Error);
